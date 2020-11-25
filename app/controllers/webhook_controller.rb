@@ -23,7 +23,7 @@ class WebhookController < ApplicationController
     end
 
     events = client.parse_events_from(body)
-    events.each { |event|
+    events.each do |event|
       logger.debug "***********************************************************"
       case event
       when Line::Bot::Event::Message
@@ -37,10 +37,7 @@ class WebhookController < ApplicationController
             text = "#{spot_name} を追加しました"
           when /\/一覧/
             logger.info "一覧に入りました"
-            text = "【行きたいところ一覧】"
-            get_from_jsonbox(boxId: event["source"]["roomId"]).each do |current_text|
-              text += "\n" + current_text["spotname"]
-            end
+            text = get_list_message(boxId: event["source"]["roomId"])
           when /\/ランダム/, /\/お店/, /\/見る/
             #todo
           else
@@ -58,19 +55,24 @@ class WebhookController < ApplicationController
           tf.write(response.body)
         end
       end
-    }
+    end
     head :ok
   end
 
   private
 
-  # @return Array of Hash JSONboxのすべてのデータのJSON
+  # @return 一覧の文字列
+  def get_list_message(boxId:)
+    spots_list = get_from_jsonbox(boxId: boxId)
+    convert_wants_list_to_text(spots_list)
+  end
+
   def get_from_jsonbox(boxId:)
     url = get_box_uri(boxId: boxId)
     response = Net::HTTP.get_response(url)
-    data = convert_to_json(response.body)
-    logger.debug "jsonboxID: #{boxId} から: #{data}を取得しました。#{response.code}"
-    data
+    spots_list = convert_to_json(response.body)
+    logger.debug "jsonboxID: #{boxId} から: #{spots_list}を取得しました。#{response.code}"
+    spots_list
   end
 
   # @param Hash
@@ -83,7 +85,14 @@ class WebhookController < ApplicationController
     headers = { "Content-Type" => "application/json" }
     response = http.post(uri.path, params.to_json, headers)
     logger.info("id:#{boxId}に#{params}をpostしました。")
-    response.body
+  end
+
+  def convert_wants_list_to_text(spots)
+    text = "【行きたいところ一覧】"
+    spots.each do |spot|
+      text += "\n" + spot["spotname"]
+    end
+    text
   end
 
   def get_box_uri(boxId:)
