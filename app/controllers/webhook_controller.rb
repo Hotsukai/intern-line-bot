@@ -37,9 +37,9 @@ class WebhookController < ApplicationController
             text = "#{spot_name} を追加しました"
           when /\/一覧/
             logger.info "一覧に入りました"
-            text = "【リスト一覧】\n"
+            text = "【行きたいところ一覧】"
             get_from_jsonbox(boxId: event["source"]["roomId"]).each do |current_text|
-              text += current_text["spot"]["name"] + "\n"
+              text += "\n" + current_text["spotname"]
             end
           when /\/ランダム/, /\/お店/, /\/見る/
             #todo
@@ -79,7 +79,7 @@ class WebhookController < ApplicationController
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = uri.scheme === "https"
 
-    params = { spot: { name: data } }
+    params = { spotname: data }
     headers = { "Content-Type" => "application/json" }
     response = http.post(uri.path, params.to_json, headers)
     logger.info("id:#{boxId}に#{params}をpostしました。")
