@@ -5,7 +5,7 @@ require "json"
 
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
-  JSON_BOX_ROOT_URL="https://jsonbox.io/"
+  JSON_BOX_ROOT_URL = "https://jsonbox.io/"
 
   def client
     @client ||= Line::Bot::Client.new { |config|
@@ -61,34 +61,35 @@ class WebhookController < ApplicationController
   end
 
   private
-    # @return Array of Hash JSONboxのすべてのデータのJSON
-    def get_from_jsonbox(boxId:)
-      url = get_box_uri(boxId:boxId)
-      response = Net::HTTP.get_response(url)
-      data = convert_to_json(response.body)
-      logger.debug "jsonbox : #{data},#{response.code}"
-      data
-    end
-  
-    # @param Hash
-    def post_to_jsonbox(data,boxId:)
-      uri = get_box_uri(boxId:boxId)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = uri.scheme === "https"
-  
-      params = data
-      headers = { "Content-Type" => "application/json" }
-      response = http.post(uri.path, params.to_json, headers)
-  
-      response.code 
-      response.body 
-    end
 
-    def get_box_uri(boxId:)
-      URI.parse(JSON_BOX_ROOT_URL+boxId)
-    end
+  # @return Array of Hash JSONboxのすべてのデータのJSON
+  def get_from_jsonbox(boxId:)
+    url = get_box_uri(boxId: boxId)
+    response = Net::HTTP.get_response(url)
+    data = convert_to_json(response.body)
+    logger.debug "jsonbox : #{data},#{response.code}"
+    data
+  end
 
-    def convert_to_json(str)
-      JSON.parse(str)
-    end
+  # @param Hash
+  def post_to_jsonbox(data, boxId:)
+    uri = get_box_uri(boxId: boxId)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = uri.scheme === "https"
+
+    params = data
+    headers = { "Content-Type" => "application/json" }
+    response = http.post(uri.path, params.to_json, headers)
+
+    response.code
+    response.body
+  end
+
+  def get_box_uri(boxId:)
+    URI.parse(JSON_BOX_ROOT_URL + boxId)
+  end
+
+  def convert_to_json(str)
+    JSON.parse(str)
+  end
 end
