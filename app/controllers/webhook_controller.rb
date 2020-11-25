@@ -12,7 +12,7 @@ class WebhookController < ApplicationController
     }
   end
   
-  # @return JSONboxのすべてのデータのJSON
+  # @return Array of Hash JSONboxのすべてのデータのJSON
   def get_from_jsonbox
     url=URI.parse(ENV["JSON_BOX_URL"])
     response=Net::HTTP.get_response(url)
@@ -21,7 +21,22 @@ class WebhookController < ApplicationController
     data
   end
 
+  # @param Hash
+  def post_to_jsonbox(data)
+    uri=URI.parse(ENV["JSON_BOX_URL"])
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = uri.scheme === "https"
+
+    params = data
+    headers = { "Content-Type" => "application/json" }
+    response = http.post(uri.path, params.to_json, headers)
+
+    response.code # status code
+    response.body # response body
+  end
+
   def callback
+    post_to_jsonbox({name: "ほつかい",description:"railsから送信"})
     json_box_data=get_from_jsonbox
     body = request.body.read
 
@@ -38,7 +53,7 @@ class WebhookController < ApplicationController
         when Line::Bot::Event::MessageType::Text
           message = {
             type: 'text',
-            text: 'オウム返し！ ： '+event.message['text']+json_box_data[0]["name"]
+            text: 'オウム返し！ ： '+event.message['text']+json_box_data[-1]["name"]
           }
           response=  client.reply_message(event['replyToken'], message)
           puts "メッセージを送信しました。response: #{response} : #{event['replyToken']} : #{message[:text]}"
