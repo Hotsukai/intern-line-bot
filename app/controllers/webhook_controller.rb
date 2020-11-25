@@ -1,16 +1,24 @@
 require 'line/bot'
+require 'net/http'
+require 'uri'
 
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
-
   def client
     @client ||= Line::Bot::Client.new { |config|
       config.channel_secret = ENV["LINE_CHANNEL_SECRET"]
       config.channel_token = ENV["LINE_CHANNEL_TOKEN"]
     }
   end
+  
+  def get_from_jsonbox
+    url=URI.parse(ENV["JSON_BOX_URL"])
+    response=Net::HTTP.get_response(url)
+    puts "jsonbox : #{response.body},#{response.code}"
+  end
 
   def callback
+    get_from_jsonbox
     body = request.body.read
 
     signature = request.env['HTTP_X_LINE_SIGNATURE']
