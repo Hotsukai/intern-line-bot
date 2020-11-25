@@ -1,6 +1,7 @@
 require "line/bot"
 require "net/http"
 require "uri"
+require "digest/md5"
 require "json"
 
 class WebhookController < ApplicationController
@@ -95,8 +96,8 @@ class WebhookController < ApplicationController
     text
   end
 
-  def get_box_uri(boxId:)
-    URI.parse(JSON_BOX_ROOT_URL + boxId)
+  def build_box_uri(boxId:)
+    URI.parse(JSON_BOX_ROOT_URL + Digest::MD5.hexdigest(boxId))
   end
 
   def convert_to_json(str)
