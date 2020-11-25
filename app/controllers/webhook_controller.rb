@@ -36,8 +36,6 @@ class WebhookController < ApplicationController
   end
 
   def callback
-    post_to_jsonbox({name: "ほつかい",description:"railsから送信"})
-    json_box_data=get_from_jsonbox
     body = request.body.read
 
     signature = request.env['HTTP_X_LINE_SIGNATURE']
@@ -47,15 +45,31 @@ class WebhookController < ApplicationController
 
     events = client.parse_events_from(body)
     events.each { |event|
+      puts "****************\nevent source : #{event["source"]["roomId"]}"
       case event
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          message = {
-            type: 'text',
-            text: 'オウム返し！ ： '+event.message['text']+json_box_data[-1]["name"]
-          }
-          response=  client.reply_message(event['replyToken'], message)
+          case event.message['text']
+          when /\/追加 .+/u
+            puts "追加"
+          when /\/一覧/
+            puts "一覧"
+            text=""
+            get_from_jsonbox.each do |current_text| 
+              text+=current_text["name"]+"\n"
+            end
+            puts text
+          when /\/ランダム/,/\/お店/,/\/見る/
+            #todo
+          else
+            text='オウム返し！ ： '+event.message['text']+json_box_data[-1]["name"]
+          end
+            message = {
+              type: 'text',
+              text: text
+            }
+          response　= client.reply_message(event['replyToken'], message)
           puts "メッセージを送信しました。response: #{response} : #{event['replyToken']} : #{message[:text]}"
         when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
           response = client.get_message_content(event.message['id'])
