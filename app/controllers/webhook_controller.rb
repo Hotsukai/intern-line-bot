@@ -29,26 +29,7 @@ class WebhookController < ApplicationController
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          case event.message["text"]
-          when /\/追加 .+/u
-            spot_name = event.message["text"].sub(/\/追加/u, "")
-            logger.info "追加に入りました"
-            post_to_jsonbox(spot_name, boxId: event["source"]["roomId"])
-            text = "#{spot_name} を追加しました"
-          when /\/一覧/
-            logger.info "一覧に入りました"
-            text = get_list_message(boxId: event["source"]["roomId"])
-          when /\/ランダム/, /\/お店/, /\/見る/
-            #todo
-          else
-            text = "オウム返し！ ： " + event.message["text"]
-          end
-          message = {
-            type: "text",
-            text: text,
-          }
-          response　 = client.reply_message(event["replyToken"], message)
-          logger.info "メッセージを送信しました。: #{message[:text]}"
+          send_reply_to_text_message_handler(event.message["text"], event["source"]["roomId"], event["replyToken"])
         when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
           response = client.get_message_content(event.message["id"])
           tf = Tempfile.open("content")
@@ -61,14 +42,37 @@ class WebhookController < ApplicationController
 
   private
 
-  # @return 一覧の文字列
-  def get_list_message(boxId:)
-    spots_list = get_from_jsonbox(boxId: boxId)
-    convert_wants_list_to_text(spots_list)
+  def send_reply_to_text_message_handler(received_message, room_id, reply_token)
+    # TODO グループでない場合の処理
+    case received_message
+    when /\/追加 .+/u
+      spot_name = received_message.sub(/\/追加/u, "")
+      logger.info "追加に入りました"
+      save_to_jsonbox(spot_name, boxId: room_id)
+      text = "#{spot_name} を追加しました"
+    when /\/一覧/
+      logger.info "一覧に入りました"
+      text = create_list_message(boxId: room_id)
+    when /\/ランダム/, /\/お店/, /\/見る/
+      #todo
+    else
+      text = "オウム返し！ ： " + received_message
+    end
+    message = {
+      type: "text",
+      text: text,
+    }
+    response　 = client.reply_message(reply_token, message)
+    logger.info "メッセージを送信しました。: #{message[:text]}"
   end
 
-  def get_from_jsonbox(boxId:)
-    url = get_box_uri(boxId: boxId)
+  # @return 一覧の文字列
+  def create_list_message(boxId:)
+    convert_wants_list_to_text(load_from_jsonbox(boxId: boxId))
+  end
+
+  def load_from_jsonbox(boxId:)
+    url = build_box_uri(boxId: boxId)
     response = Net::HTTP.get_response(url)
     spots_list = convert_to_json(response.body)
     logger.debug "jsonboxID: #{boxId} から: #{spots_list}を取得しました。#{response.code}"
@@ -76,26 +80,27 @@ class WebhookController < ApplicationController
   end
 
   # @param Hash
-  def post_to_jsonbox(data, boxId:)
-    uri = get_box_uri(boxId: boxId)
+  def save_to_jsonbox(data, boxId:)
+    uri = build_box_uri(boxId: boxId)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = uri.scheme === "https"
 
     params = { spotname: data }
     headers = { "Content-Type" => "application/json" }
-    response = http.post(uri.path, params.to_json, headers)
+    http.post(uri.path, params.to_json, headers)
     logger.info("id:#{boxId}に#{params}をpostしました。")
   end
 
   def convert_wants_list_to_text(spots)
     text = "【行きたいところ一覧】"
+    #TODO 0件のときの処理
     spots.each do |spot|
       text += "\n" + spot["spotname"]
     end
     text
   end
 
-  def get_box_uri(boxId:)
+  def build_box_uri(boxId:)
     URI.parse(JSON_BOX_ROOT_URL + boxId)
   end
 
