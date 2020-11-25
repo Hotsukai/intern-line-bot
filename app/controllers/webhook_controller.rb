@@ -24,21 +24,23 @@ class WebhookController < ApplicationController
 
     events = client.parse_events_from(body)
     events.each { |event|
-      logger.debug "****************\nevent source : #{event["source"]["roomId"]}"
+      logger.debug "***********************************************************"
       case event
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
           case event.message["text"]
           when /\/追加 .+/u
+            spot_name = event.message["text"].sub(/\/追加/u, "")
             logger.info "追加に入りました"
+            post_to_jsonbox(spot_name, boxId: event["source"]["roomId"])
+            text = "#{spot_name} を追加しました"
           when /\/一覧/
             logger.info "一覧に入りました"
-            text = ""
-            get_from_jsonbox.each do |current_text|
-              text += current_text["name"] + "\n"
+            text = "【リスト一覧】\n"
+            get_from_jsonbox(boxId: event["source"]["roomId"]).each do |current_text|
+              text += current_text["spot"]["name"] + "\n"
             end
-            logger.info text
           when /\/ランダム/, /\/お店/, /\/見る/
             #todo
           else
@@ -49,7 +51,7 @@ class WebhookController < ApplicationController
             text: text,
           }
           response　 = client.reply_message(event["replyToken"], message)
-          logger.info "メッセージを送信しました。response: #{response} : #{event["replyToken"]} : #{message[:text]}"
+          logger.info "メッセージを送信しました。: #{message[:text]}"
         when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
           response = client.get_message_content(event.message["id"])
           tf = Tempfile.open("content")
@@ -67,7 +69,7 @@ class WebhookController < ApplicationController
     url = get_box_uri(boxId: boxId)
     response = Net::HTTP.get_response(url)
     data = convert_to_json(response.body)
-    logger.debug "jsonbox : #{data},#{response.code}"
+    logger.debug "jsonboxID: #{boxId} から: #{data}を取得しました。#{response.code}"
     data
   end
 
@@ -77,11 +79,10 @@ class WebhookController < ApplicationController
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = uri.scheme === "https"
 
-    params = data
+    params = { spot: { name: data } }
     headers = { "Content-Type" => "application/json" }
     response = http.post(uri.path, params.to_json, headers)
-
-    response.code
+    logger.info("id:#{boxId}に#{params}をpostしました。")
     response.body
   end
 
