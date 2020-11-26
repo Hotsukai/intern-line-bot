@@ -45,11 +45,16 @@ class WebhookController < ApplicationController
   def send_reply_to_text_message_handler(received_message, room_id, reply_token)
     # TODO グループでない場合の処理
     case received_message
-    when /\/追加 .+/u
-      spot_name = received_message.sub(/\/追加/u, "")
+    when /\/追加.+/u
+      spot_name = received_message.sub(/\/追加/u, "").gsub(/　/," ").strip
       logger.info "追加に入りました"
       save_to_jsonbox(spot_name, boxId: room_id)
       text = "#{spot_name} を追加しました"
+    when /\/削除.+/u
+      spot_name = received_message.sub(/\/削除/u, "").gsub(/　/," ").strip
+      logger.info "削除に入りました"
+      remove_from_jsonbox(spot_name, boxId: room_id)
+      text = "#{spot_name} を削除しました"
     when /\/一覧/
       logger.info "一覧に入りました"
       text = create_list_message(boxId: room_id)
@@ -64,14 +69,28 @@ class WebhookController < ApplicationController
     logger.info "メッセージを送信しました。: #{message[:text]}"
   end
 
+  def remove_from_jsonbox(spot_name, boxId:)
+    uri = build_box_uri(:boxId => boxId, :query_str => build_delete_query(spot_name))
+    logger.debug uri
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    request = Net::HTTP::Delete.new(uri.request_uri)
+    response = http.request(request)
+    logger.info("id:#{boxId}から#{spot_name}をdeleteしました。#{response.body}")
+  end
+
+  def build_delete_query(spot_name)
+    "?" + URI.encode("q=spotName:" + spot_name)
+  end
+
   # @return 一覧の文字列
   def create_list_message(boxId:)
     convert_wants_list_to_text(load_from_jsonbox(boxId: boxId))
   end
 
   def load_from_jsonbox(boxId:)
-    url = build_box_uri(boxId: boxId)
-    response = Net::HTTP.get_response(url)
+    uri = build_box_uri(boxId: boxId)
+    response = Net::HTTP.get_response(uri)
     spots_list = convert_to_json(response.body)
     logger.debug "jsonboxID: #{boxId} から: #{spots_list}を取得しました。#{response.code}"
     spots_list
@@ -81,9 +100,8 @@ class WebhookController < ApplicationController
   def save_to_jsonbox(data, boxId:)
     uri = build_box_uri(boxId: boxId)
     http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = uri.scheme === "https"
-
-    params = { spotname: data }
+    params = { spotName: data }
+    http.use_ssl = true
     headers = { "Content-Type" => "application/json" }
     http.post(uri.path, params.to_json, headers)
     logger.info("id:#{boxId}に#{params}をpostしました。")
@@ -93,13 +111,13 @@ class WebhookController < ApplicationController
     text = "【行きたいところ一覧】"
     #TODO 0件のときの処理
     spots.each do |spot|
-      text += "\n" + spot["spotname"]
+      text += "\n" + spot["spotName"]
     end
     text
   end
 
-  def build_box_uri(boxId:)
-    URI.parse(JSON_BOX_ROOT_URL + boxId)
+  def build_box_uri(boxId:, query_str: "")
+    URI.parse(JSON_BOX_ROOT_URL + boxId + query_str)
   end
 
   def convert_to_json(str)
