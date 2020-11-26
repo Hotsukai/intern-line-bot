@@ -46,13 +46,7 @@ class WebhookController < ApplicationController
           tf.write(response.body)
         end
       when Line::Bot::Event::Join
-        logger.info("how" + HOW_TO_USE_MESSAGE)
-        message = {
-          type: "text",
-          text: "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE,
-        }
-        response　 = client.reply_message(event["replyToken"], message)
-        logger.info "メッセージを送信しました。: #{message[:text]}"
+        send_text_message(event["replyToken"], "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
       end
     end
     head :ok
@@ -79,6 +73,10 @@ class WebhookController < ApplicationController
     else
       return
     end
+    send_text_message(reply_token, text)
+  end
+
+  def send_text_message(reply_token, text)
     message = {
       type: "text",
       text: text,
