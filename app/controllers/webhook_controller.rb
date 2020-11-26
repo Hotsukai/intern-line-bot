@@ -2,6 +2,7 @@ require "line/bot"
 require "net/http"
 require "uri"
 require "json"
+require "digest/sha1"
 
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
@@ -81,7 +82,7 @@ class WebhookController < ApplicationController
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = uri.scheme === "https"
 
-    params = { spotname: data }
+    params = { spotName: data, spotId: generate_spot_id(data) }
     headers = { "Content-Type" => "application/json" }
     http.post(uri.path, params.to_json, headers)
     logger.info("id:#{boxId}に#{params}をpostしました。")
@@ -91,7 +92,7 @@ class WebhookController < ApplicationController
     text = "【行きたいところ一覧】"
     #TODO 0件のときの処理
     spots.each do |spot|
-      text += "\n" + spot["spotname"]
+      text += "\n" + spot["spotName"]
     end
     text
   end
@@ -102,5 +103,10 @@ class WebhookController < ApplicationController
 
   def convert_to_json(str)
     JSON.parse(str)
+  end
+
+  def generate_spot_id(s_name)
+    s_id = Digest::SHA256.hexdigest(s_name)
+    s_id[0, 20]
   end
 end
