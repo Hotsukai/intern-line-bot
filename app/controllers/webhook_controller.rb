@@ -6,6 +6,13 @@ require "json"
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
   JSON_BOX_ROOT_URL = "https://jsonbox.io/"
+  HOW_TO_USE_MESSAGE = "このBotではスラッシュコマンドを使うことで、トークルーム・グループごとに行きたいところリストを作成する事ができます。
+【行きたいところリストに追加】
+/追加 場所の名前
+【行きたいところリストから削除】
+/削除 場所の名前
+【行きたいところリストを見る。】
+/一覧"
 
   def client
     @client ||= Line::Bot::Client.new { |config|
@@ -35,6 +42,14 @@ class WebhookController < ApplicationController
           tf = Tempfile.open("content")
           tf.write(response.body)
         end
+      when Line::Bot::Event::Join
+        logger.info("how"+HOW_TO_USE_MESSAGE)
+        message = {
+          type: "text",
+          text: "グループに招待ありがとうございます！\n"+HOW_TO_USE_MESSAGE,
+        }
+        response　 = client.reply_message(event["replyToken"], message)
+        logger.info "メッセージを送信しました。: #{message[:text]}"
       end
     end
     head :ok
