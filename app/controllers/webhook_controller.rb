@@ -46,12 +46,12 @@ class WebhookController < ApplicationController
     # TODO グループでない場合の処理
     case received_message
     when /\/追加.+/u
-      spot_name = received_message.sub(/\/追加/u, "").strip
+      spot_name = received_message.sub(/\/追加/u, "").gsub(/　/," ").strip
       logger.info "追加に入りました"
       save_to_jsonbox(spot_name, boxId: room_id)
       text = "#{spot_name} を追加しました"
     when /\/削除.+/u
-      spot_name = received_message.sub(/\/削除/u, "").strip
+      spot_name = received_message.sub(/\/削除/u, "").gsub(/　/," ").strip
       logger.info "削除に入りました"
       remove_from_jsonbox(spot_name, boxId: room_id)
       text = "#{spot_name} を削除しました"
