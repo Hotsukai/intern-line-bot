@@ -46,15 +46,18 @@ class WebhookController < ApplicationController
     # TODO グループでない場合の処理
     case received_message
     when /\/追加.+/u
-      spot_name = received_message.sub(/\/追加/u, "").gsub(/　/," ").strip
+      spot_name = received_message.sub(/\/追加/u, "").gsub(/　/, " ").strip
       logger.info "追加に入りました"
       save_to_jsonbox(spot_name, boxId: room_id)
       text = "#{spot_name} を追加しました"
     when /\/削除.+/u
-      spot_name = received_message.sub(/\/削除/u, "").gsub(/　/," ").strip
+      spot_name = received_message.sub(/\/削除/u, "").gsub(/　/, " ").strip
       logger.info "削除に入りました"
-      remove_from_jsonbox(spot_name, boxId: room_id)
-      text = "#{spot_name} を削除しました"
+      if (remove_from_jsonbox(spot_name, boxId: room_id))
+        text = "#{spot_name} を削除しました"
+      else
+        text = "削除できませんでした"
+      end
     when /\/一覧/
       logger.info "一覧に入りました"
       text = create_list_message(boxId: room_id)
@@ -76,7 +79,9 @@ class WebhookController < ApplicationController
     http.use_ssl = true
     request = Net::HTTP::Delete.new(uri.request_uri)
     response = http.request(request)
-    logger.info("id:#{boxId}から#{spot_name}をdeleteしました。#{response.body}")
+
+    logger.info("id:#{boxId}から#{spot_name}をdeleteしました。#{response.body.delete("^0-9").to_i}")
+    return response.body.delete("^0-9").to_i > 0
   end
 
   def build_delete_query(spot_name)
