@@ -31,24 +31,24 @@ class WebhookController < ApplicationController
 
     events = client.parse_events_from(body)
     events.each do |event|
-      talk_id = event["source"]["groupId"]
-      talk_id ||= event["source"]["roomId"]
-      talk_id ||= event["source"]["userId"]
+      begin
+        talk_id = event["source"]["groupId"]
+        talk_id ||= event["source"]["roomId"]
+        talk_id ||= event["source"]["userId"]
 
-      case event
-      when Line::Bot::Event::Message
-        case event.type
-        when Line::Bot::Event::MessageType::Text
-          send_reply_to_text_message_handler(event.message["text"], talk_id, event["replyToken"])
-        when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
-          response = client.get_message_content(event.message["id"])
-          tf = Tempfile.open("content")
-          tf.write(response.body)
+        case event
+        when Line::Bot::Event::Message
+          if event.type == Line::Bot::Event::MessageType::Text
+            send_reply_to_text_message_handler(event.message["text"], talk_id, event["replyToken"])
+          end
+        when Line::Bot::Event::Join
+          send_text_message(event["replyToken"], "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
+        when Line::Bot::Event::Follow
+          send_text_message(event["replyToken"], "友だち追加ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
         end
-      when Line::Bot::Event::Join
-        send_text_message(event["replyToken"], "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
-      when Line::Bot::Event::Follow
-        send_text_message(event["replyToken"], "友だち追加ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
+      rescue => error
+        logger.error error
+        send_text_message(event["replyToken"], "エラーが発生しました。")
       end
     end
     head :ok
@@ -60,12 +60,12 @@ class WebhookController < ApplicationController
     # TODO グループでない場合の処理
     case received_message
     when /\/追加.+/u
-      spot_name = received_message.sub(/\/追加/u, "").gsub(/　/," ").strip
+      spot_name = received_message.sub(/\/追加/u, "").gsub(/　/, " ").strip
       logger.info "追加に入りました"
       save_to_jsonbox(spot_name, boxId: talk_id)
       text = "#{spot_name} を追加しました"
     when /\/削除.+/u
-      spot_name = received_message.sub(/\/削除/u, "").gsub(/　/," ").strip
+      spot_name = received_message.sub(/\/削除/u, "").gsub(/　/, " ").strip
       logger.info "削除に入りました"
       remove_from_jsonbox(spot_name, boxId: talk_id)
       text = "#{spot_name} を削除しました"
