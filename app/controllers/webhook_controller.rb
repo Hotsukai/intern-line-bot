@@ -6,7 +6,7 @@ require "json"
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
   JSON_BOX_ROOT_URL = "https://jsonbox.io/"
-  HOW_TO_USE_MESSAGE = "このBotではスラッシュコマンドを使うことで、トークルーム・グループごとに行きたいところリストを作成する事ができます。
+  HOW_TO_USE_MESSAGE = "このBotではスラッシュコマンドを使うことで、個人チャット・トークルーム・グループごとに行きたいところリストを作成する事ができます。
 【行きたいところリストに追加】
 /追加 場所の名前
 【行きたいところリストから削除】
@@ -47,6 +47,8 @@ class WebhookController < ApplicationController
         end
       when Line::Bot::Event::Join
         send_text_message(event["replyToken"], "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
+      when Line::Bot::Event::Follow
+        send_text_message(event["replyToken"], "友だち追加ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
       end
     end
     head :ok
