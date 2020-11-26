@@ -6,13 +6,15 @@ require "json"
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
   JSON_BOX_ROOT_URL = "https://jsonbox.io/"
-  HOW_TO_USE_MESSAGE = "このBotではスラッシュコマンドを使うことで、個人チャット・トークルーム・グループごとに行きたいところリストを作成する事ができます。
+  HOW_TO_USE_MESSAGE = <<EOS
+このBotではスラッシュコマンドを使うことで、個人チャット・トークルーム・グループごとに行きたいところリストを作成する事ができます。
 【行きたいところリストに追加】
 /追加 場所の名前
 【行きたいところリストから削除】
 /削除 場所の名前
 【行きたいところリストを見る。】
-/一覧"
+/一覧
+EOS
 
   def client
     @client ||= Line::Bot::Client.new { |config|
@@ -31,9 +33,8 @@ class WebhookController < ApplicationController
 
     events = client.parse_events_from(body)
     events.each do |event|
-      talk_id = event["source"]["groupId"]
-      talk_id ||= event["source"]["roomId"]
-      talk_id ||= event["source"]["userId"]
+      source = event["source"]
+      talk_id = source["groupId"] || source["roomId"] || source["userId"]
 
       case event
       when Line::Bot::Event::Message
