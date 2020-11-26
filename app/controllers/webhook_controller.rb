@@ -53,10 +53,8 @@ class WebhookController < ApplicationController
     when /\/一覧/
       logger.info "一覧に入りました"
       text = create_list_message(boxId: room_id)
-    when /\/ランダム/, /\/お店/, /\/見る/
-      #todo
     else
-      text = "オウム返し！ ： " + received_message
+      return
     end
     message = {
       type: "text",
