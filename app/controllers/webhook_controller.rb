@@ -59,19 +59,22 @@ class WebhookController < ApplicationController
   def send_reply_to_text_message_handler(received_message, talk_id, reply_token)
     # TODO グループでない場合の処理
     case received_message
-    when /\/追加.+/u
+    when /^\/追加.+/u
       spot_name = received_message.sub(/\/追加/u, "").strip
       logger.info "追加に入りました"
       save_to_jsonbox(spot_name, boxId: talk_id)
       text = "#{spot_name} を追加しました"
-    when /\/削除.+/u
+    when /^\/削除.+/u
       spot_name = received_message.sub(/\/削除/u, "").strip
       logger.info "削除に入りました"
       remove_from_jsonbox(spot_name, boxId: talk_id)
       text = "#{spot_name} を削除しました"
-    when /\/一覧/
+    when /^\/一覧/
       logger.info "一覧に入りました"
       text = create_list_message(boxId: talk_id)
+    when /^\//
+      logger.info "スラッシュエラーに入りました"
+      text = "※コマンドが間違っています※\n" + HOW_TO_USE_MESSAGE
     else
       return
     end
