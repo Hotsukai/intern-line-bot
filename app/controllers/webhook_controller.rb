@@ -6,6 +6,13 @@ require "json"
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
   JSON_BOX_ROOT_URL = "https://jsonbox.io/"
+  HOW_TO_USE_MESSAGE = "このBotではスラッシュコマンドを使うことで、個人チャット・トークルーム・グループごとに行きたいところリストを作成する事ができます。
+【行きたいところリストに追加】
+/追加 場所の名前
+【行きたいところリストから削除】
+/削除 場所の名前
+【行きたいところリストを見る。】
+/一覧"
 
   def client
     @client ||= Line::Bot::Client.new { |config|
@@ -24,17 +31,24 @@ class WebhookController < ApplicationController
 
     events = client.parse_events_from(body)
     events.each do |event|
-      logger.debug "***********************************************************"
+      talk_id = event["source"]["groupId"]
+      talk_id ||= event["source"]["roomId"]
+      talk_id ||= event["source"]["userId"]
+
       case event
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          send_reply_to_text_message_handler(event.message["text"], event["source"]["roomId"], event["replyToken"])
+          send_reply_to_text_message_handler(event.message["text"], talk_id, event["replyToken"])
         when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
           response = client.get_message_content(event.message["id"])
           tf = Tempfile.open("content")
           tf.write(response.body)
         end
+      when Line::Bot::Event::Join
+        send_text_message(event["replyToken"], "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
+      when Line::Bot::Event::Follow
+        send_text_message(event["replyToken"], "友だち追加ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
       end
     end
     head :ok
@@ -42,25 +56,32 @@ class WebhookController < ApplicationController
 
   private
 
-  def send_reply_to_text_message_handler(received_message, room_id, reply_token)
+  def send_reply_to_text_message_handler(received_message, talk_id, reply_token)
     # TODO グループでない場合の処理
     case received_message
     when /\/追加.+/u
       spot_name = received_message.sub(/\/追加/u, "").gsub(/　/," ").strip
       logger.info "追加に入りました"
-      save_to_jsonbox(spot_name, boxId: room_id)
+      save_to_jsonbox(spot_name, boxId: talk_id)
       text = "#{spot_name} を追加しました"
     when /\/削除.+/u
       spot_name = received_message.sub(/\/削除/u, "").gsub(/　/," ").strip
       logger.info "削除に入りました"
-      remove_from_jsonbox(spot_name, boxId: room_id)
+      remove_from_jsonbox(spot_name, boxId: talk_id)
       text = "#{spot_name} を削除しました"
-    when /\/一覧/
+    when /^\/一覧/
       logger.info "一覧に入りました"
-      text = create_list_message(boxId: room_id)
+      text = create_list_message(boxId: talk_id)
+    when /^\//
+      logger.info "スラッシュエラーに入りました"
+      text = "※コマンドが間違っています※\n" + HOW_TO_USE_MESSAGE
     else
       return
     end
+    send_text_message(reply_token, text)
+  end
+
+  def send_text_message(reply_token, text)
     message = {
       type: "text",
       text: text,
