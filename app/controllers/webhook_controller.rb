@@ -74,13 +74,14 @@ EOS
       logger.info "追加に入りました"
       save_to_jsonbox(spot_name, boxId: talk_id)
       text = "#{spot_name} を追加しました"
-      # send_text_message(reply_token, text)
-      send_template_message(reply_token, spot_name)
+      send_template_message(reply_token, spot_name, flag: "add")
+      return
     when /^\/削除.+/u
       spot_name = received_message.sub(/\/削除/u, "").gsub(/　/, " ").strip
       logger.info "削除に入りました"
       remove_from_jsonbox(spot_name, boxId: talk_id)
-      text = "#{spot_name} を削除しました"
+      send_template_message(reply_token, spot_name, flag: "remove")
+      return
     when /^\/全削除/
       logger.info "全削除に入りました"
       remove_from_jsonbox("*", boxId: talk_id)
@@ -100,11 +101,16 @@ EOS
     send_text_message(reply_token, text) #return text ->そとでsend
   end
 
-  def send_template_message(reply_token, spotname)
-    logger.debug("template")
+  def send_template_message(reply_token, spotname, flag:)
+    case flag
+    when "add"
+      actions = { done: "追加", undo: "削除" }
+    when "remove"
+      actions = { done: "削除", undo: "追加" }
+    end
     message = {
       "type": "text",
-      "text": "#{spotname}を追加しました。",
+      "text": "#{spotname}を#{actions[:done]}しました。",
       "quickReply": {
         "items": [
           {
@@ -120,7 +126,7 @@ EOS
             "action": {
               "type": "message",
               "label": "取り消し",
-              "text": "/削除 #{spotname}",
+              "text": "/#{actions[:undo]} #{spotname}",
             },
           },
         ],
