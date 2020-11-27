@@ -56,9 +56,9 @@ EOS
           tf.write(response.body)
         end
       when Line::Bot::Event::Join
-        send_text_message(event["replyToken"], "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
+        send_message(event["replyToken"], "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
       when Line::Bot::Event::Follow
-        send_text_message(event["replyToken"], "友だち追加ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
+        send_message(event["replyToken"], "友だち追加ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
       end
     end
     head :ok
@@ -68,20 +68,20 @@ EOS
 
   def send_reply_to_text_message_handler(received_message, talk_id, reply_token)
     # TODO グループでない場合の処理
+    undo=""
     case received_message
     when /^\/追加.+/u
       spot_name = received_message.sub(/\/追加/u, "").gsub(/　/, " ").strip
       logger.info "追加に入りました"
       save_to_jsonbox(spot_name, boxId: talk_id)
-      text = "#{spot_name} を追加しました"
-      send_template_message(reply_token, spot_name, actions: { done: "追加", undo: "削除" })
-      return
+      text = "#{spot_name}を追加しました"
+      undo = "削除"
     when /^\/削除.+/u
       spot_name = received_message.sub(/\/削除/u, "").gsub(/　/, " ").strip
       logger.info "削除に入りました"
       remove_from_jsonbox(spot_name, boxId: talk_id)
-      send_template_message(reply_token, spot_name, actions: { done: "削除", undo: "追加" })
-      return
+      text = "#{spot_name}を削除しました"
+      undo = "追加"
     when /^\/全削除/
       logger.info "全削除に入りました"
       remove_from_jsonbox("*", boxId: talk_id)
@@ -98,42 +98,10 @@ EOS
     else
       return
     end
-    send_text_message(reply_token, text) #return text ->そとでsend
+    send_message(reply_token, text, undo: undo, spot_name: spot_name)
   end
 
-  def send_template_message(reply_token, spotname, actions:)
-    message = {
-      "type": "text",
-      "text": "#{spotname}を#{actions[:done]}しました。",
-      "sender": {
-        "name": "StoreSpotWith!!",
-      },
-      "quickReply": {
-        "items": [
-          {
-            "type": "action",
-            "action": {
-              "type": "message",
-              "label": "一覧をみる",
-              "text": "/一覧",
-            },
-          },
-          {
-            "type": "action",
-            "action": {
-              "type": "message",
-              "label": "取り消し",
-              "text": "/#{actions[:undo]} #{spotname}",
-            },
-          },
-        ],
-      },
-    }
-    response　 = client.reply_message(reply_token, message)
-    logger.info "テンプレートメッセージを送信しました。: #{response}"
-  end
-
-  def send_text_message(reply_token, text)
+  def send_message(reply_token, text, undo: "", spot_name: "")
     message = {
       type: "text",
       text: text,
@@ -141,7 +109,29 @@ EOS
         name: "StoreSpotWith!!",
       },
     }
-    response　 = client.reply_message(reply_token, message)
+    if undo.present? and spot_name.present?
+      message[:quickReply] = {
+        items: [
+          {
+            type: "action",
+            action: {
+              type: "message",
+              label: "一覧をみる",
+              text: "/一覧",
+            },
+          },
+          {
+            type: "action",
+            action: {
+              type: "message",
+              label: "取り消し",
+              text: "/#{undo} #{spot_name}",
+            },
+          },
+        ],
+      }
+    end
+    client.reply_message(reply_token, message)
     logger.info "メッセージを送信しました。: #{message[:text]}"
   end
 
