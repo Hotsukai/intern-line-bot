@@ -33,23 +33,22 @@ EOS
 
     events = client.parse_events_from(body)
     events.each do |event|
+      begin
       source = event["source"]
       talk_id = source["groupId"] || source["roomId"] || source["userId"]
-
       case event
       when Line::Bot::Event::Message
-        case event.type
-        when Line::Bot::Event::MessageType::Text
+        if event.type == Line::Bot::Event::MessageType::Text
           send_reply_to_text_message_handler(event.message["text"], talk_id, event["replyToken"])
-        when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
-          response = client.get_message_content(event.message["id"])
-          tf = Tempfile.open("content")
-          tf.write(response.body)
         end
       when Line::Bot::Event::Join
         send_text_message(event["replyToken"], "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
       when Line::Bot::Event::Follow
         send_text_message(event["replyToken"], "友だち追加ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
+        end
+      rescue => error
+        logger.error error
+        send_text_message(event["replyToken"], "エラーが発生しました。")
       end
     end
     head :ok
@@ -68,9 +67,12 @@ EOS
     when /^\/削除.+/u
       spot_name = received_message.sub(/\/削除/u, "").gsub(/　/," ").strip
       logger.info "削除に入りました"
-      remove_from_jsonbox(spot_name, boxId: talk_id)
-      text = "#{spot_name} を削除しました"
-    when /^\/一覧/
+      if remove_from_jsonbox(spot_name, boxId: talk_id)
+        text = "#{spot_name} を削除しました"
+      else
+        text = "削除できませんでした"
+      end
+    when /\/一覧/
       logger.info "一覧に入りました"
       text = create_list_message(boxId: talk_id)
     when /^\//
@@ -98,7 +100,8 @@ EOS
     http.use_ssl = true
     request = Net::HTTP::Delete.new(uri.request_uri)
     response = http.request(request)
-    logger.info("id:#{boxId}から#{spot_name}をdeleteしました。#{response.body}")
+    logger.debug("id:#{boxId}から#{spot_name}をdeleteしました")
+    response.body.delete("^0-9").to_i > 0
   end
 
   def build_delete_query(spot_name)
