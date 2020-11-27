@@ -8,12 +8,21 @@ class WebhookController < ApplicationController
   JSON_BOX_ROOT_URL = "https://jsonbox.io/"
   HOW_TO_USE_MESSAGE = <<EOS
 このBotではスラッシュコマンドを使うことで、個人チャット・トークルーム・グループごとに行きたいところリストを作成する事ができます。
+
 【行きたいところリストに追加】
 /追加 場所の名前
+
 【行きたいところリストから削除】
 /削除 場所の名前
+
+【行きたいところリストから全て削除】
+/全削除
+
 【行きたいところリストを見る。】
 /一覧
+
+【使い方を見る】
+/使い方
 EOS
 
   def client
@@ -34,17 +43,17 @@ EOS
     events = client.parse_events_from(body)
     events.each do |event|
       begin
-      source = event["source"]
-      talk_id = source["groupId"] || source["roomId"] || source["userId"]
-      case event
-      when Line::Bot::Event::Message
-        if event.type == Line::Bot::Event::MessageType::Text
-          send_reply_to_text_message_handler(event.message["text"], talk_id, event["replyToken"])
-        end
-      when Line::Bot::Event::Join
-        send_text_message(event["replyToken"], "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
-      when Line::Bot::Event::Follow
-        send_text_message(event["replyToken"], "友だち追加ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
+        source = event["source"]
+        talk_id = source["groupId"] || source["roomId"] || source["userId"]
+        case event
+        when Line::Bot::Event::Message
+          if event.type == Line::Bot::Event::MessageType::Text
+            send_reply_to_text_message_handler(event.message["text"], talk_id, event["replyToken"])
+          end
+        when Line::Bot::Event::Join
+          send_text_message(event["replyToken"], "グループに招待ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
+        when Line::Bot::Event::Follow
+          send_text_message(event["replyToken"], "友だち追加ありがとうございます！\n" + HOW_TO_USE_MESSAGE)
         end
       rescue => error
         logger.error error
@@ -60,34 +69,79 @@ EOS
     # TODO グループでない場合の処理
     case received_message
     when /^\/追加.+/u
-      spot_name = received_message.sub(/\/追加/u, "").gsub(/　/," ").strip
+      spot_name = received_message.sub(/\/追加/u, "").gsub(/　/, " ").strip
       logger.info "追加に入りました"
       save_to_jsonbox(spot_name, boxId: talk_id)
       text = "#{spot_name} を追加しました"
+      # send_text_message(reply_token, text)
+      send_template_message(reply_token, spot_name)
     when /^\/削除.+/u
-      spot_name = received_message.sub(/\/削除/u, "").gsub(/　/," ").strip
+      spot_name = received_message.sub(/\/削除/u, "").gsub(/　/, " ").strip
       logger.info "削除に入りました"
       if remove_from_jsonbox(spot_name, boxId: talk_id)
         text = "#{spot_name} を削除しました"
       else
         text = "削除できませんでした"
       end
-    when /\/一覧/
+    when /^\/全削除/
+      logger.info "全削除に入りました"
+      if remove_from_jsonbox("*", boxId: talk_id)
+        text = "リストから全てを削除しました"
+      else
+        text = "削除できませんでした"
+      end
+    when /^\/一覧/
       logger.info "一覧に入りました"
       text = create_list_message(boxId: talk_id)
+    when /^\/使い方/, /^\/つかいかた/
+      logger.info "使い方に入りました"
+      text = HOW_TO_USE_MESSAGE
     when /^\//
       logger.info "スラッシュエラーに入りました"
       text = "※コマンドが間違っています※\n" + HOW_TO_USE_MESSAGE
     else
       return
     end
-    send_text_message(reply_token, text)
+    send_text_message(reply_token, text) #return text ->そとでsend
+  end
+
+  def send_template_message(reply_token, spotname)
+    logger.debug("template")
+    message = {
+      "type": "text",
+      "text": "#{spotname}を追加しました。",
+      "quickReply": {
+        "items": [
+          {
+            "type": "action",
+            "action": {
+              "type": "message",
+              "label": "一覧をみる",
+              "text": "/一覧",
+            },
+          },
+          {
+            "type": "action",
+            "action": {
+              "type": "message",
+              "label": "取り消し",
+              "text": "/削除 #{spotname}",
+            },
+          },
+        ],
+      },
+    }
+    response　 = client.reply_message(reply_token, message)
+    logger.info "テンプレートメッセージを送信しました。: #{response}"
   end
 
   def send_text_message(reply_token, text)
     message = {
       type: "text",
       text: text,
+      sender: {
+        name: "StoreSpot",
+      },
     }
     response　 = client.reply_message(reply_token, message)
     logger.info "メッセージを送信しました。: #{message[:text]}"
