@@ -104,7 +104,7 @@ EOS
     logger.debug("template")
     message = {
       "type": "text",
-      "text": "追加しました。",
+      "text": "#{spotname}を追加しました。",
       "quickReply": {
         "items": [
           {
