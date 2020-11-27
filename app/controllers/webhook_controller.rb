@@ -105,6 +105,9 @@ EOS
     message = {
       "type": "text",
       "text": "#{spotname}を#{actions[:done]}しました。",
+      "sender": {
+        "name": "StoreSpotWith!!",
+      },
       "quickReply": {
         "items": [
           {
@@ -135,7 +138,7 @@ EOS
       type: "text",
       text: text,
       sender: {
-        name: "StoreSpot",
+        name: "StoreSpotWith!!",
       },
     }
     response　 = client.reply_message(reply_token, message)
