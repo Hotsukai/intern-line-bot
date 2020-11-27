@@ -73,7 +73,6 @@ EOS
       logger.info "追加に入りました"
       save_to_jsonbox(spot_name, boxId: talk_id)
       text = "#{spot_name} を追加しました"
-      # send_text_message(reply_token, text)
       send_template_message(reply_token, spot_name)
     when /^\/削除.+/u
       spot_name = received_message.sub(/\/削除/u, "").gsub(/　/, " ").strip
@@ -110,6 +109,9 @@ EOS
     message = {
       "type": "text",
       "text": "#{spotname}を追加しました。",
+      "sender": {
+        "name": "StoreSpotWith!!",
+      },
       "quickReply": {
         "items": [
           {
@@ -140,7 +142,7 @@ EOS
       type: "text",
       text: text,
       sender: {
-        name: "StoreSpot",
+        name: "StoreSpotWith!!",
       },
     }
     response　 = client.reply_message(reply_token, message)
