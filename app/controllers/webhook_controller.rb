@@ -8,12 +8,21 @@ class WebhookController < ApplicationController
   JSON_BOX_ROOT_URL = "https://jsonbox.io/"
   HOW_TO_USE_MESSAGE = <<EOS
 このBotではスラッシュコマンドを使うことで、個人チャット・トークルーム・グループごとに行きたいところリストを作成する事ができます。
+
 【行きたいところリストに追加】
 /追加 場所の名前
+
 【行きたいところリストから削除】
 /削除 場所の名前
+
+【行きたいところリストから全て削除】
+/全削除
+
 【行きたいところリストを見る。】
 /一覧
+
+【使い方を見る】
+/使い方
 EOS
 
   def client
@@ -72,9 +81,16 @@ EOS
       logger.info "削除に入りました"
       remove_from_jsonbox(spot_name, boxId: talk_id)
       text = "#{spot_name} を削除しました"
+    when /^\/全削除/
+      logger.info "全削除に入りました"
+      remove_from_jsonbox("*", boxId: talk_id)
+      text = "リストから全てを削除しました"
     when /^\/一覧/
       logger.info "一覧に入りました"
       text = create_list_message(boxId: talk_id)
+    when /^\/使い方/, /^\/つかいかた/
+      logger.info "使い方に入りました"
+      text = HOW_TO_USE_MESSAGE
     when /^\//
       logger.info "スラッシュエラーに入りました"
       text = "※コマンドが間違っています※\n" + HOW_TO_USE_MESSAGE
@@ -92,21 +108,21 @@ EOS
       "quickReply": {
         "items": [
           {
-                "type": "action",
-                "action": {
-                  "type": "message",
-                  "label": "一覧をみる",
-                  "text": "/一覧",
-                },
-              },
+            "type": "action",
+            "action": {
+              "type": "message",
+              "label": "一覧をみる",
+              "text": "/一覧",
+            },
+          },
           {
-                "type": "action",
-                "action": {
-                  "type": "message",
-                  "label": "取り消し",
-                  "text": "/削除 #{spotname}",
-                },
-              },
+            "type": "action",
+            "action": {
+              "type": "message",
+              "label": "取り消し",
+              "text": "/削除 #{spotname}",
+            },
+          },
         ],
       },
     }
